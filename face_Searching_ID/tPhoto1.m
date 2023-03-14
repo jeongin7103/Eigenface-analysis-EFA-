@@ -1,0 +1,144 @@
+function tPhoto1(void)
+% training images (photo)
+%clear all; % be heedfull of persistent
+n = 20;		% the number of images (channels)
+M = 45; 	% H width
+N = 40;		% V length
+dimensions = n;
+
+x = zeros(n, M*N);	% 45*40=1800
+for k=1:n,
+    src = sprintf('./src_img/%d.png',k);
+    img = double(rgb2gray(imread(src))); % img = double(imread(src));
+    label_1(k) =k;
+    %img = imread(src);
+    %figure;     imshow(uint8(img));
+    x(k,:) = (img(:))';
+    %img1{k} = reshape(uint8(img),M,N);
+    img1{k} = reshape(img,M,N);
+end;
+
+images = reshape(x',M,N,size(x,1));
+labels = label_1;
+% check image size
+[is1, is2, is3] = size(images);
+fprintf('image width : %d \n', is1)
+fprintf('image Length : %d \n', is2)
+fprintf('number of images : %d \n', is3)
+
+figure(11)
+subplot(1,2,1)
+imshow(images(:,:,1), 'Initialmagnification', 'fit', 'DisplayRange',[]);
+title('example original image, the first')
+subplot(1,2,2)
+imshow(images(:,:,end), 'Initialmagnification', 'fit', 'DisplayRange',[]);
+title('example original image, the end')
+
+% data preprocessing
+ldata = zeros(size(images, 3), size(images, 1)*size(images, 2));
+for k=1:size(images, 3)
+	tmp = images(:,:,k);
+	ldata(k,:) = tmp(:);
+end
+
+% select number of Eigenface to use
+dm = n-2;    % hard coding(2) or n-1 or n
+
+% Random number selection
+pick = round(n*rand(1,1)); % 0<=pick<=dimension(n)
+%Q = fix(pick/20);
+Q = pick;
+fprintf('finding %d \n', Q)
+fprintf('Enter\n')
+
+tt_data = ldata(pick, :);
+tt_ans = labels(:,pick);
+targetfig = reshape((tt_data), is1, is2);
+%tr_data = ldata([1:pick-1 pick+1:end], :); % you but me
+tr_data = ldata;    % everybody
+is3 = size(tr_data, 1);
+
+% mean of training data
+mu_data = mean(tr_data);
+
+% Remove mean
+meansub_data = tr_data - mu_data; % repmat(mu_data, size(tr_data, 1), 1);
+x = meansub_data;
+
+figure(12)
+imshow(reshape(mu_data,is1,is2), 'Initialmagnification', 'fit', 'DisplayRange',[]);
+title('mean face')
+
+% find Eigenface v.2
+[U,S,V] = svd(x');
+%eig_tr_org = U(:,[1:dm])*V(:,[1:dm])';
+%for i=1:1:dm
+%  eigen_fcs1=U(:,i)*V(:,i)'; 	% eigenface formulation v.1
+%end
+eigen_fcs1=U(:,[1:dm])*V([1:dm],[1:dm])'; 	% eigenface formulation v.2
+%eigen_fcs1=U(:,[1:dm]);
+
+% select svd or bigger Eigenface
+eig_tr =  eigen_fcs1;   %eig_tr = sort_v(:, 1:dm);
+
+% find coefficient
+coeff_tr = meansub_data*eig_tr;
+
+figure(13)
+if dm < 9
+    tmp_array1 = zeros(is1, is2, 9);
+    for i = 1:2		% 2 figures
+        tmp_array1(:,:,i) = reshape(eig_tr(:,i), is1, is2);
+    end
+    array_Vlarge = [tmp_array1(:,:,1) tmp_array1(:,:,2)];
+    imshow(array_Vlarge ,'Initialmagnification','fit', 'DisplayRange',[]);
+    str = sprintf('Eigenfaces example first 2 among %d', dm);
+    title(str)    
+
+elseif dm > 8
+    tmp_array1 = zeros(is1, is2, 9);
+    for i = 1:9		% 9 figures
+        tmp_array1(:,:,i) = reshape(eig_tr(:,i), is1, is2);
+    end
+    array_Vlarge = [tmp_array1(:,:,1) tmp_array1(:,:,2) tmp_array1(:,:,3);...
+        tmp_array1(:,:,4) tmp_array1(:,:,5) tmp_array1(:,:,6);...
+        tmp_array1(:,:,7) tmp_array1(:,:,8) tmp_array1(:,:,9)];
+    imshow(array_Vlarge ,'Initialmagnification','fit', 'DisplayRange',[]);
+    str = sprintf('Eigenfaces example first 9 among %d', dm);
+    title(str)
+end
+
+figure(14)
+subplot(121)
+imshow(targetfig,'Initialmagnification','fit', 'DisplayRange',[]);
+str = sprintf('searching... %d', tt_ans);
+title(str)
+
+% processing test data
+meansub_tt = tt_data - mu_data;
+coeff_tt = meansub_tt*eig_tr;
+
+% find answer
+subplot(122)
+z = zeros(1, is3);
+for i = 1:is3
+    z(1,i) = norm(coeff_tr(i,:) - coeff_tt, 2);
+    imshow(images(:,:,i))
+    drawnow;
+end
+
+[min_z, min_zi] = min(z);
+subplot(122)
+imshow(images(:,:,min_zi), 'DisplayRange',[]);
+str = sprintf('answer... %d', min_zi);
+title(str)
+    
+% image reconstruction
+reco = eig_tr*coeff_tt';
+recofig = reco + mu_data';
+final_reco = reshape(recofig, is1, is2);
+
+figure(15)
+imshow(final_reco, 'Initialmagnification', 'fit', 'DisplayRange',[]);
+str = sprintf('reconstructed image used %d eigenface', dm);
+title(str)
